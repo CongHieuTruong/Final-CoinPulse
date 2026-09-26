@@ -43,5 +43,5 @@ def test_handle_task_saves_mocked_bitcoin_price(database):
     mocked_response.raise_for_status.assert_called_once_with()
 
     saved_record = RawData.query.filter_by(coin_name="bitcoin").one()
-    assert saved_record.price_usd == 80000
+    assert saved_record.price_usd == 800001
     channel.basic_ack.assert_called_once_with(delivery_tag=1)

@@ -429,7 +429,7 @@ def home():
 
             <div class="container">
                 <h1>CoinPulse</h1>
-                <p class="subtitle">AI-Powered Crypto Intelligence!</p>
+                <p class="subtitle">AI-Powered Crypto Intelligence</p>
 
                 <form id="analysis-form">
                     <div class="input-group">
