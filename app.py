@@ -7,11 +7,14 @@ import pika
 from flask import Flask, Response, jsonify, render_template_string
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
-from models import AnalyzedData, db
+from models import AnalyzedData, RawData, db
 
 app = Flask(__name__)
 database_path = Path(__file__).resolve().parent / "coinpulse.sqlite3"
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{database_path}"
+database_url = os.environ.get("DATABASE_URL", f"sqlite:///{database_path}")
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
@@ -29,6 +32,12 @@ def seed_data_if_empty():
     if db.session.query(AnalyzedData.id).first() is not None:
         return
 
+    db.session.add_all(
+        [
+            RawData(coin_name="bitcoin", price_usd=50000),
+            RawData(coin_name="ethereum", price_usd=3000),
+        ]
+    )
     db.session.add_all(
         [
             AnalyzedData(
@@ -104,10 +113,17 @@ def latest_analysis(coin_name):
     if analysis is None:
         return jsonify({"error": f"No analysis found for {coin_name}."}), 404
 
+    latest_raw = (
+        RawData.query.filter_by(coin_name=coin_name)
+        .order_by(RawData.timestamp.desc(), RawData.id.desc())
+        .first()
+    )
+
     return jsonify(
         {
             "id": analysis.id,
             "coin_name": analysis.coin_name,
+            "current_price": latest_raw.price_usd if latest_raw else None,
             "moving_average_price": analysis.moving_average_price,
             "trend": analysis.trend,
             "timestamp": analysis.timestamp.isoformat(),
@@ -133,11 +149,18 @@ def home():
                 <button type="submit">Analyze</button>
             </form>
             <p id="status" role="status"></p>
-            <pre id="result"></pre>
+            <section id="result" hidden>
+                <p>Current price: $<span id="current-price"></span></p>
+                <p>Average price: $<span id="average-price"></span></p>
+                <p>Trend: <strong id="trend"></strong></p>
+            </section>
             <script>
                 const form = document.getElementById("analysis-form");
                 const status = document.getElementById("status");
                 const result = document.getElementById("result");
+                const currentPrice = document.getElementById("current-price");
+                const averagePrice = document.getElementById("average-price");
+                const trend = document.getElementById("trend");
 
                 const wait = (milliseconds) =>
                     new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -146,7 +169,7 @@ def home():
                     event.preventDefault();
                     const coinName = document.getElementById("coin-name").value.trim();
                     status.textContent = "Queuing update...";
-                    result.textContent = "";
+                    result.hidden = true;
 
                     try {
                         const triggerResponse = await fetch(
@@ -164,9 +187,11 @@ def home():
                                 `/api/v1/analysis/${encodeURIComponent(coinName)}`
                             );
                             if (analysisResponse.ok) {
-                                result.textContent = JSON.stringify(
-                                    await analysisResponse.json(), null, 2
-                                );
+                                const analysis = await analysisResponse.json();
+                                currentPrice.textContent = analysis.current_price ?? "N/A";
+                                averagePrice.textContent = analysis.moving_average_price;
+                                trend.textContent = analysis.trend;
+                                result.hidden = false;
                                 status.textContent = "Analysis updated.";
                                 return;
                             }

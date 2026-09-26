@@ -34,6 +34,7 @@ def analyze_coin(coin_name):
         db.session.commit()
         return {
             "coin_name": analyzed_data.coin_name,
+            "current_price": latest_price,
             "moving_average_price": analyzed_data.moving_average_price,
             "trend": analyzed_data.trend,
         }
@@ -46,13 +47,19 @@ def handle_task(channel, method, properties, body):
         channel.basic_ack(delivery_tag=method.delivery_tag)
         print(
             f"Analyzed {result['coin_name']}: "
+            f"current=${result['current_price']:.2f}, "
             f"average=${result['moving_average_price']:.2f}, trend={result['trend']}"
         )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        with app.app_context():
+            db.session.rollback()
+        print(f"Analyzer rejected invalid task: {error}")
+        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as error:
         with app.app_context():
             db.session.rollback()
         print(f"Analyzer failed: {error}")
-        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 
 def consume_tasks():
