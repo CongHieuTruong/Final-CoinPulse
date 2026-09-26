@@ -1,27 +1,18 @@
 # File: app.py
-from flask import Flask, request, render_template_string
+from pathlib import Path
+
+from flask import Flask
+from models import db
 
 app = Flask(__name__)
+database_path = Path(__file__).resolve().parent / "coinpulse.sqlite3"
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{database_path}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Extremely basic HTML interface with an input field
-HTML_TEMPLATE = '''
-    <h1>CryptoScope MVP - Echo Test</h1>
-    <form method="POST">
-        <label>Enter a keyword (e.g., Bitcoin):</label><br>
-        <input type="text" name="user_input" required>
-        <button type="submit">Submit!</button>
-    </form>
-    {% if result %}
-        <h2 style="color: green;">System response: You just entered "{{ result }}"</h2>
-    {% endif %}
-'''
+db.init_app(app)
 
-@app.route('/', methods=['GET', 'POST'])
-def home():
-    user_input = None
-    if request.method == 'POST':
-        user_input = request.form.get('user_input') # Receive data
-    return render_template_string(HTML_TEMPLATE, result=user_input) # Echo to the screen
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,2 +1,7 @@
 Flask
+Flask-SQLAlchemy
+requests
+pika
+prometheus_client
+pytest
 gunicorn
