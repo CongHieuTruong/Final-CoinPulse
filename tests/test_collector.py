@@ -26,14 +26,15 @@ def database():
         db.engines.clear()
 
 
-def test_handle_task_saves_mocked_bitcoin_price(database):
+@patch("collector.requests.get")
+def test_handle_task_saves_mocked_bitcoin_price(mocked_get, database):
     mocked_response = Mock()
     mocked_response.json.return_value = {"bitcoin": {"usd": 80000}}
+    mocked_get.return_value = mocked_response
     channel = Mock()
     method = SimpleNamespace(delivery_tag=1)
 
-    with patch("collector.requests.get", return_value=mocked_response) as mocked_get:
-        handle_task(channel, method, None, b'{"coin_name": "bitcoin"}')
+    handle_task(channel, method, None, b'{"coin_name": "bitcoin"}')
 
     mocked_get.assert_called_once_with(
         COINGECKO_URL,

@@ -5,3 +5,4 @@
 coinpulse.sqlite3
 __pycache__/
 .pytest_cache/
+project_info.txt
