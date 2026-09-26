@@ -25,6 +25,31 @@ with app.app_context():
     db.create_all()
 
 
+def seed_data_if_empty():
+    if db.session.query(AnalyzedData.id).first() is not None:
+        return
+
+    db.session.add_all(
+        [
+            AnalyzedData(
+                coin_name="bitcoin",
+                moving_average_price=50000,
+                trend="bullish",
+            ),
+            AnalyzedData(
+                coin_name="ethereum",
+                moving_average_price=3000,
+                trend="bullish",
+            ),
+        ]
+    )
+    db.session.commit()
+
+
+with app.app_context():
+    seed_data_if_empty()
+
+
 @app.before_request
 def count_http_request():
     HTTP_REQUESTS.inc()
