@@ -52,3 +52,28 @@ def test_analyze_coin_saves_average_trend_and_current_price(analysis_database):
     with app.app_context():
         saved_analysis = AnalyzedData.query.filter_by(coin_name="bitcoin").one()
         assert saved_analysis.moving_average_price == 75000
+
+
+def test_analyze_coin_saves_bearish_trend(analysis_database):
+    with app.app_context():
+        db.session.add_all(
+            [
+                RawData(
+                    coin_name="ethereum",
+                    price_usd=4000,
+                    timestamp=datetime(2026, 1, 1),
+                ),
+                RawData(
+                    coin_name="ethereum",
+                    price_usd=3000,
+                    timestamp=datetime(2026, 1, 2),
+                ),
+            ]
+        )
+        db.session.commit()
+
+    result = analyze_coin("ethereum")
+
+    assert result["current_price"] == 3000
+    assert result["moving_average_price"] == 3500
+    assert result["trend"] == "bearish"

@@ -1,17 +1,15 @@
 # File: app.py
 import json
 import os
-from pathlib import Path
 
 import pika
-from flask import Flask, Response, jsonify, render_template_string
+from flask import Flask, Response, jsonify, render_template_string, request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
 from models import AnalyzedData, RawData, db
 
 app = Flask(__name__)
-database_path = Path(__file__).resolve().parent / "coinpulse.sqlite3"
-database_url = os.environ.get("DATABASE_URL", f"sqlite:///{database_path}")
+database_url = os.environ.get("DATABASE_URL", "sqlite:///coinpulse.sqlite3")
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
@@ -22,6 +20,7 @@ db.init_app(app)
 HTTP_REQUESTS = Counter(
     "http_requests_total",
     "Total number of HTTP requests received by the Flask app.",
+    ["method", "endpoint", "status"],
 )
 
 with app.app_context():
@@ -29,7 +28,10 @@ with app.app_context():
 
 
 def seed_data_if_empty():
-    if db.session.query(AnalyzedData.id).first() is not None:
+    if (
+        db.session.query(AnalyzedData.id).first() is not None
+        or db.session.query(RawData.id).first() is not None
+    ):
         return
 
     db.session.add_all(
@@ -59,9 +61,11 @@ with app.app_context():
     seed_data_if_empty()
 
 
-@app.before_request
-def count_http_request():
-    HTTP_REQUESTS.inc()
+@app.after_request
+def count_http_request(response):
+    endpoint = request.endpoint or "unknown"
+    HTTP_REQUESTS.labels(request.method, endpoint, str(response.status_code)).inc()
+    return response
 
 
 @app.get("/health")
@@ -456,7 +460,7 @@ def home():
                         <span class="result-value price-highlight" id="current-price">$0.00</span>
                     </div>
                     <div class="result-item">
-                        <span class="result-label">Moving Avg (24h)</span>
+                        <span class="result-label">Historical Average Price</span>
                         <span class="result-value" id="average-price">$0.00</span>
                     </div>
                     <div class="result-item">

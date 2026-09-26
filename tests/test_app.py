@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 import pytest
 from sqlalchemy import create_engine
 
-from app import app
+from app import app, seed_data_if_empty
 from collector import COINGECKO_URL, fetch_price
 from models import AnalyzedData, RawData, db
 
@@ -79,3 +79,34 @@ def test_analysis_endpoint_returns_latest_prices_and_trend(client, monkeypatch):
 
     assert trigger_response.status_code == 202
     assert published == [("crypto_tasks", {"coin_name": "bitcoin"})]
+
+
+def test_analysis_endpoint_returns_404_for_unknown_coin(client):
+    response = client.get("/api/v1/analysis/does-not-exist")
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "No analysis found for does-not-exist."
+
+
+def test_trigger_returns_503_without_rabbitmq_configuration(client, monkeypatch):
+    monkeypatch.delenv("CLOUDAMQP_URL", raising=False)
+
+    response = client.post("/api/v1/trigger/bitcoin")
+
+    assert response.status_code == 503
+    assert "CLOUDAMQP_URL" in response.get_json()["error"]
+
+
+def test_seed_data_populates_empty_database(client):
+    with app.app_context():
+        seed_data_if_empty()
+
+        analyzed_coins = {
+            record.coin_name for record in AnalyzedData.query.order_by(AnalyzedData.id)
+        }
+        raw_coins = {
+            record.coin_name for record in RawData.query.order_by(RawData.id)
+        }
+
+    assert analyzed_coins == {"bitcoin", "ethereum"}
+    assert raw_coins == {"bitcoin", "ethereum"}

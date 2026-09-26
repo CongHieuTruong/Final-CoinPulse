@@ -15,7 +15,7 @@ Browser -> Flask REST API -> crypto_tasks -> Collector -> RawData
 - **Collector worker**: consumes `crypto_tasks`, fetches CoinGecko prices, stores raw data, and publishes `analysis_tasks`.
 - **Analyzer worker**: consumes `analysis_tasks`, calculates the average and trend, and stores the analysis.
 - **Local database**: SQLite in `coinpulse.sqlite3`.
-- **Production database**: Render PostgreSQL through `DATABASE_URL`, configured in `render.yaml`.
+- **Production database**: PostgreSQL through `DATABASE_URL` when a shared production database is configured.
 
 ## Requirements
 
@@ -78,7 +78,7 @@ python -m pytest
 
 ## Render deployment
 
-`render.yaml` defines a web service, collector worker, analyzer worker, and PostgreSQL database. Configure `CLOUDAMQP_URL` for the web and worker services. GitHub Actions calls the Render deploy hook after tests pass.
+The Flask web service is deployed manually through the Render dashboard with `gunicorn app:app`. Configure `CLOUDAMQP_URL` and, when applicable, `DATABASE_URL` as environment variables. GitHub Actions calls the Render deploy hook after tests pass. Collector and Analyzer are run locally for the free-tier demonstration.
 
 Required GitHub secret:
 
