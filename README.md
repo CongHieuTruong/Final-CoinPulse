@@ -19,7 +19,7 @@ Browser -> Flask REST API -> crypto_tasks -> Collector -> RawData
 
 ## Requirements
 
-- Python 3.10 or newer
+- Python 3.10+
 - CloudAMQP RabbitMQ URL in `CLOUDAMQP_URL`
 - CoinGecko API access
 
