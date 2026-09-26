@@ -1,8 +1,14 @@
-import argparse
+import json
+import os
 from statistics import mean
+
+import pika
 
 from app import app
 from models import AnalyzedData, RawData, db
+
+
+TASK_QUEUE = "analysis_tasks"
 
 
 def analyze_coin(coin_name):
@@ -33,17 +39,35 @@ def analyze_coin(coin_name):
         }
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Analyze stored cryptocurrency prices.")
-    parser.add_argument("coin_name", help="CoinGecko coin ID, for example bitcoin")
-    args = parser.parse_args()
+def handle_task(channel, method, properties, body):
+    try:
+        message = json.loads(body)
+        result = analyze_coin(message["coin_name"])
+        channel.basic_ack(delivery_tag=method.delivery_tag)
+        print(
+            f"Analyzed {result['coin_name']}: "
+            f"average=${result['moving_average_price']:.2f}, trend={result['trend']}"
+        )
+    except Exception as error:
+        with app.app_context():
+            db.session.rollback()
+        print(f"Analyzer failed: {error}")
+        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
-    result = analyze_coin(args.coin_name)
-    print(
-        f"Analyzed {result['coin_name']}: "
-        f"average=${result['moving_average_price']:.2f}, trend={result['trend']}"
-    )
+
+def consume_tasks():
+    cloudamqp_url = os.environ.get("CLOUDAMQP_URL")
+    if not cloudamqp_url:
+        raise RuntimeError("CLOUDAMQP_URL environment variable is not configured.")
+
+    connection = pika.BlockingConnection(pika.URLParameters(cloudamqp_url))
+    channel = connection.channel()
+    channel.queue_declare(queue=TASK_QUEUE, durable=True)
+    channel.basic_qos(prefetch_count=1)
+    channel.basic_consume(queue=TASK_QUEUE, on_message_callback=handle_task)
+    print(f"Waiting for tasks on {TASK_QUEUE}...")
+    channel.start_consuming()
 
 
 if __name__ == "__main__":
-    main()
+    consume_tasks()
