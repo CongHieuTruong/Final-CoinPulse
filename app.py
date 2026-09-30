@@ -36,20 +36,20 @@ def seed_data_if_empty():
 
     db.session.add_all(
         [
-            RawData(coin_name="bitcoin", price_usd=50000),
-            RawData(coin_name="ethereum", price_usd=3000),
+            RawData(coin_name="bitcoin", price_usd=83724),
+            RawData(coin_name="ethereum", price_usd=2684),
         ]
     )
     db.session.add_all(
         [
             AnalyzedData(
                 coin_name="bitcoin",
-                moving_average_price=50000,
+                moving_average_price=83724,
                 trend="bullish",
             ),
             AnalyzedData(
                 coin_name="ethereum",
-                moving_average_price=3000,
+                moving_average_price=2684,
                 trend="bullish",
             ),
         ]
